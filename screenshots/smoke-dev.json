@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "CherryMap",
+      "hasCanvas": false,
+      "bodyTextLen": 4814,
+      "bodyTextHash": "01b9e931bbbe9967a8584641eb600d1ffbe8c63996036428849218640a580319",
+      "bodyTextPrefix": "Victoria Ankara Addis Ababa Cairo Rostov-on-Don Moscow Lusaka Pr",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/smoke-dev.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "CherryMap",
+      "hasCanvas": false,
+      "bodyTextLen": 3863,
+      "bodyTextHash": "e665dae3cc106462ae112717692a7899eaa814fdee5b0f7c168cad62209b8f61",
+      "bodyTextPrefix": "Victoria Ankara Addis Ababa Cairo Rostov-on-Don Moscow Lusaka Pr",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/smoke-dev-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/smoke-dev.json"
+}

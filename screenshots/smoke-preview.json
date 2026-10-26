@@ -1,0 +1,41 @@
+{
+  "url": "http://127.0.0.1:8081",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "CherryMap",
+      "hasCanvas": false,
+      "bodyTextLen": 45,
+      "bodyTextHash": "b07f0f4bf29057b1ef598a9a58d82a78d4deccede2d47389dcc65251ddebec89",
+      "bodyTextPrefix": "CherryMap Loading the source-ready workspace…",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/smoke-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "CherryMap",
+      "hasCanvas": false,
+      "bodyTextLen": 45,
+      "bodyTextHash": "b07f0f4bf29057b1ef598a9a58d82a78d4deccede2d47389dcc65251ddebec89",
+      "bodyTextPrefix": "CherryMap Loading the source-ready workspace…",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/smoke-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/smoke-preview.json",
+  "divergesFromBaseline": true,
+  "baselineReasons": [
+    "desktop: body text collapsed (4814 -> 45 chars)",
+    "mobile: body text collapsed (3863 -> 45 chars)"
+  ]
+}

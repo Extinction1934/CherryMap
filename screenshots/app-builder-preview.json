@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "CherryMap",
+      "hasCanvas": false,
+      "bodyTextLen": 4816,
+      "bodyTextHash": "6f22140037ce747a730802a21f7f77dc97e7b8cb505ad93f1660cf195ee18ef4",
+      "bodyTextPrefix": "Victoria Ankara Addis Ababa Cairo Rostov-on-Don Moscow Lusaka Pr",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "CherryMap",
+      "hasCanvas": false,
+      "bodyTextLen": 3932,
+      "bodyTextHash": "4f30fd5259927fa04b55d3e436e8ea49b82eb671f5f8cc2ed6562a3b8fd50b67",
+      "bodyTextPrefix": "Victoria Ankara Addis Ababa Cairo Rostov-on-Don Moscow Lusaka Pr",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
