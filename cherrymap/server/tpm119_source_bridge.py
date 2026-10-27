@@ -27,6 +27,7 @@ from bisect import bisect_left, bisect_right
 from urllib.parse import unquote, urlsplit
 
 from .anaconda_plugin import pin_fields as anaconda_pin
+from .operator_terminal import pin_fields as operator_pin
 from .portx_terminal import ORBITAL_ID, pin_fields as portx_pin
 
 BRIDGE_COLOR = "#1e6b48"
@@ -700,6 +701,7 @@ class Tpm119SourceBridge:
             self._emit_clusters(groups, zoom, cell, places)
         self._emit_live_lattice(groups, zoom, cell, places)
         self._emit_portx(groups, zoom, places)
+        self._emit_operator(groups, zoom, places)
         self._emit_fusion_context(groups, zoom, cell, places, south, north, west, east)
         return places
 
@@ -936,6 +938,71 @@ class Tpm119SourceBridge:
                 record = _cluster_record(
                     identifier=record_id, name=fields["name"], lat=lat, lng=lng, origin="neural-feed",
                     category="portx-cluster", color=fields["color"], provenance=fields["provenance"],
+                    count=count, bounds=_bounds(agg[3], agg[4], agg[5], agg[6], span * 0.08),
+                )
+            if fields["address"]:
+                record["address"] = fields["address"]
+            record["observed_at"] = fields["observed_at"]
+            record["refreshed_at"] = refreshed
+            places.append(record)
+
+    def _emit_operator(self, groups: dict, zoom: int, places: list[dict[str, object]]) -> None:
+        """Operator cells use their own span and the trailing record, not another channel's pin."""
+        if zoom < FAR_RANGE_ZOOM or not groups:
+            return
+        cycle = self._fusion_cycle()
+        refreshed = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        span = 0.14 if zoom < 11 else 0.045 if zoom < 14 else 0.009 if zoom < 17 else 0.0028
+        buckets: dict[tuple[int, int], list] = {}
+        for payload in groups.values():
+            points: list[tuple[float, float, list[str]]] = []
+            if payload and isinstance(payload[0], tuple):
+                points = [(float(item[0]), float(item[1]), [str(item[4] or "")]) for item in payload]
+            else:
+                count = int(payload[0]) if payload else 0
+                if 1 <= count <= 236_560:
+                    stored = payload[21] if len(payload) > 21 and isinstance(payload[21], list) else []
+                    points = [(float(payload[1]) / count, float(payload[2]) / count, [str(item) for item in stored])]
+            for lat, lng, names in points:
+                key = (math.floor(lat / span), math.floor((lng + 180.0) / span))
+                current = buckets.get(key)
+                if current is None:
+                    current = [1, lat, lng, lat, lat, lng, lng, []]
+                    buckets[key] = current
+                else:
+                    current[0] += 1
+                    current[1] += lat
+                    current[2] += lng
+                    if lat < current[3]:
+                        current[3] = lat
+                    if lat > current[4]:
+                        current[4] = lat
+                    if lng < current[5]:
+                        current[5] = lng
+                    if lng > current[6]:
+                        current[6] = lng
+                for name in names:
+                    _remember_feed(current, name)
+        expanded = zoom >= 16
+        for (lat_i, lng_i), agg in buckets.items():
+            count = int(agg[0])
+            if count < 1:
+                continue
+            lat = max(-90.0, min(90.0, (lat_i + 0.18) * span))
+            lng = max(-180.0, min(180.0, (lng_i + 0.81) * span - 180.0))
+            fields = operator_pin(cycle, list(agg[7]))
+            if not fields["name"]:
+                continue
+            record_id = f"neural:operator:z{zoom}:{lat_i}:{lng_i}"
+            if expanded:
+                record = _pin_record(
+                    identifier=record_id, name=fields["name"], lat=lat, lng=lng, origin="neural-feed",
+                    category=fields["category"], color=fields["color"], provenance=fields["provenance"],
+                )
+            else:
+                record = _cluster_record(
+                    identifier=record_id, name=fields["name"], lat=lat, lng=lng, origin="neural-feed",
+                    category="operator-cluster", color=fields["color"], provenance=fields["provenance"],
                     count=count, bounds=_bounds(agg[3], agg[4], agg[5], agg[6], span * 0.08),
                 )
             if fields["address"]:

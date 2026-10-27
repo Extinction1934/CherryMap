@@ -13,6 +13,8 @@ const PORTX_ORBITAL = "9478e72a99d4559998eb69046357fbe0";
 const PORTX_STORAGE = "546686003903bbb8af5594b077ef1ef316b47107a459acfb34d9ec8275f6950a";
 const PORTX_REKEY = "c007fe0431d43e97f01e369e7022a00864ba3b7792a0f80c1130e31add7104f2";
 const PORTX_PROVENANCE = `PortX terminal · orbital ${PORTX_ORBITAL} · software bridge`;
+const OPERATOR = "#be185d";
+const OPERATOR_PROVENANCE = "Operator feed · TPM-119 software bridge";
 const SOURCE_COLOR = "#b92d49";
 const ROADS = new Set(["motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "living_street", "service", "track", "path", "footway", "cycleway", "pedestrian", "road", "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link", "street_lamp", "traffic_signals", "platform", "bus_stop", "tram_stop", "halt", "waste_basket", "bicycle_parking", "bench", "vending_machine", "post_box", "recycling"]);
 const CATEGORY_KEYS = ["amenity", "shop", "tourism", "leisure", "office", "craft", "historic", "healthcare", "public_transport", "railway", "natural", "man_made", "building", "landuse", "highway"];
@@ -489,6 +491,49 @@ function portxFeeds(rows: { lat: number; lng: number; name?: string }[], zoom: n
   return out;
 }
 
+function operatorFeeds(rows: { lat: number; lng: number; name?: string }[], zoom: number): Place[] {
+  if (zoom < 8 || !rows.length) return [];
+  const span = zoom < 11 ? 0.14 : zoom < 14 ? 0.045 : zoom < 17 ? 0.009 : 0.0028;
+  const groups = new Map<string, { count: number; latKey: number; lngKey: number; south: number; north: number; west: number; east: number; feeds: string[] }>();
+  for (const row of rows) {
+    const latKey = Math.floor(row.lat / span);
+    const lngKey = Math.floor((row.lng + 180) / span);
+    const key = `${latKey}:${lngKey}`;
+    const feed = (row.name || "").replace(/\s+/g, " ").trim().replace(/^NeuralLink · /, "");
+    const current = groups.get(key);
+    if (!current) groups.set(key, { count: 1, latKey, lngKey, south: row.lat, north: row.lat, west: row.lng, east: row.lng, feeds: feed ? [feed] : [] });
+    else {
+      current.count += 1;
+      current.south = Math.min(current.south, row.lat); current.north = Math.max(current.north, row.lat);
+      current.west = Math.min(current.west, row.lng); current.east = Math.max(current.east, row.lng);
+      if (feed && !current.feeds.includes(feed) && current.feeds.length < 12) current.feeds.push(feed);
+    }
+  }
+  const refreshed = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+  const observed = `fusion cycle ${fusionCycle()}`;
+  const expanded = zoom >= 16;
+  const out: Place[] = [];
+  for (const group of groups.values()) {
+    const label = group.feeds[group.feeds.length - 1] || "";
+    if (!label) continue;
+    const detail = group.feeds.filter(item => item !== label).join(" · ");
+    out.push(pin({
+      id: `neural:operator:z${zoom}:${group.latKey}:${group.lngKey}`,
+      name: label.length > 36 ? `${label.slice(0, 35).trimEnd()}…` : label,
+      ...(detail ? { address: detail.slice(0, 280) } : {}),
+      lat: Math.max(-90, Math.min(90, (group.latKey + 0.18) * span)),
+      lng: Math.max(-180, Math.min(180, (group.lngKey + 0.81) * span - 180)),
+      origin: "neural-feed", category: expanded ? "operator" : "operator-cluster", color: OPERATOR, provenance: OPERATOR_PROVENANCE,
+      observed_at: observed, refreshed_at: refreshed,
+      ...(expanded ? {} : { cluster: { count: group.count, bounds: {
+        south: Math.max(-90, group.south - span * 0.08), north: Math.min(90, group.north + span * 0.08),
+        west: Math.max(-180, group.west - span * 0.08), east: Math.min(180, group.east + span * 0.08),
+      } } }),
+    }));
+  }
+  return out;
+}
+
 function fusionContext(rows: { lat: number; lng: number; name?: string }[], zoom: number, box: GeographicBounds): Place[] {
   if (zoom < 8 || rows.length < 2) return [];
   const span = zoom < 11 ? 0.08 : zoom < 14 ? 0.03 : zoom < 17 ? 0.012 : 0.004;
@@ -565,7 +610,7 @@ async function frame(box: GeographicBounds, zoom: number) {
     anacondaRows = rows.length ? rows : cities;
     poiRows = clusterPlaces(anacondaRows, zoom, box);
   }
-  poiRows = [...poiRows, ...anacondaFeeds(anacondaRows, zoom), ...portxFeeds(anacondaRows, zoom), ...fusionContext(anacondaRows, zoom, box)];
+  poiRows = [...poiRows, ...anacondaFeeds(anacondaRows, zoom), ...portxFeeds(anacondaRows, zoom), ...operatorFeeds(anacondaRows, zoom), ...fusionContext(anacondaRows, zoom, box)];
   return snapshot(locations, index, poiSnapshot(poiRows, box));
 }
 

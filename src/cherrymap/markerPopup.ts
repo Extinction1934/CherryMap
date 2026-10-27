@@ -14,8 +14,9 @@ export function markerPopup(
 
   const badge = document.createElement('span');
   badge.className = `marker-popup-badge ${place.origin === 'source' ? 'source' : 'provider'}`;
-  badge.textContent = place.origin === 'source' ? place.position_origin === 'local-update' ? 'SERVER COORDINATE UPDATE' : 'STATIC SOURCE LOCATION' : place.origin === 'coordinates' ? 'COORDINATES' : place.category === 'portx' || place.category === 'portx-cluster' ? 'PORTX' : place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' ? 'ANACONDA' : place.category === 'live-cluster' ? 'LIVE INTELLIGENCE CLUSTER' : place.category === 'lattice-cluster' ? 'LATTICE PARTNER CLUSTER' : place.category === 'restricted-lattice' ? 'LATTICE PARTNER DIRECT' : place.cluster ? (place.origin === 'neural-feed' ? 'NEURALLINK CLUSTER' : place.origin === 'open-poi' ? 'BRIDGE POI CLUSTER' : 'GEOGRAPHIC INDEX CLUSTER') : place.origin === 'open-index' ? 'OPEN GEOGRAPHIC INDEX' : place.origin === 'neural-feed' ? 'NEURALLINK INTERNAL FEED' : place.origin === 'open-poi' ? 'NAMED PLACE' : 'SOURCE-BRIDGED PROVIDER PLACE';
+  badge.textContent = place.origin === 'source' ? place.position_origin === 'local-update' ? 'SERVER COORDINATE UPDATE' : 'STATIC SOURCE LOCATION' : place.origin === 'coordinates' ? 'COORDINATES' : place.category === 'operator' || place.category === 'operator-cluster' ? 'OPERATOR' : place.category === 'portx' || place.category === 'portx-cluster' ? 'PORTX' : place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' ? 'ANACONDA' : place.category === 'live-cluster' ? 'LIVE INTELLIGENCE CLUSTER' : place.category === 'lattice-cluster' ? 'LATTICE PARTNER CLUSTER' : place.category === 'restricted-lattice' ? 'LATTICE PARTNER DIRECT' : place.cluster ? (place.origin === 'neural-feed' ? 'NEURALLINK CLUSTER' : place.origin === 'open-poi' ? 'BRIDGE POI CLUSTER' : 'GEOGRAPHIC INDEX CLUSTER') : place.origin === 'open-index' ? 'OPEN GEOGRAPHIC INDEX' : place.origin === 'neural-feed' ? 'NEURALLINK INTERNAL FEED' : place.origin === 'open-poi' ? 'NAMED PLACE' : 'SOURCE-BRIDGED PROVIDER PLACE';
   if (place.category === 'portx' || place.category === 'portx-cluster') badge.className = 'marker-popup-badge portx';
+  if (place.category === 'operator' || place.category === 'operator-cluster') badge.className = 'marker-popup-badge operator';
   if (place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence') badge.className = 'marker-popup-badge live';
   const heading = document.createElement('h2');
   heading.textContent = place.marker?.popup.heading || place.name;
@@ -128,7 +129,9 @@ export function markerPopup(
   if (place.cluster) {
     const count = document.createElement('p');
     count.className = 'marker-popup-provenance';
-    count.textContent = place.category === 'portx-cluster'
+    count.textContent = place.category === 'operator-cluster'
+      ? `${place.cluster.count.toLocaleString()} operator feeds in this cell. Expand to open them.`
+      : place.category === 'portx-cluster'
       ? `${place.cluster.count.toLocaleString()} PortX signals in this cell. Expand to open them.`
       : place.category === 'anaconda-cluster'
       ? `${place.cluster.count.toLocaleString()} feeds in this fusion cell. Expand to open the cell.`
