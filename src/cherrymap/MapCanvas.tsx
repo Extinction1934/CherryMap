@@ -10,6 +10,7 @@ import { reconcileSourceMarkers, type MarkerRecord } from './sourceMarkerSync';
 import type { Bootstrap, MapActions, MapStyle, Place, RouteData, ViewState } from './types';
 import { ensureGoogleMapsEngine } from './customGoogleMapsEngine';
 import { interconnectGraph } from './interconnect';
+import { readSavedCamera } from './bridgeDisplay';
 
 let mapsPromise: Promise<void> | null = null;
 function loadMaps(_config: Bootstrap['maps']): Promise<void> {
@@ -82,7 +83,7 @@ export default function MapCanvas(props: Props) {
       title: place.marker?.title || place.name,
       icon: place.cluster ? clusterMarkerIcon(place.cluster.count, false, place.marker?.color) : place.overview ? geographicOverviewIcon() : markerIcon(place.origin === 'source', false, place.marker?.color),
       clickable: true, optimized: false,
-      zIndex: place.category === 'portx' || place.category === 'portx-cluster' ? 180 : place.category === 'iplasma-c3' || place.category === 'iplasma-c3-cluster' ? 176 : place.category === 'operator' || place.category === 'operator-cluster' ? 175 : place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' || place.category === 'live-cluster' ? 170 : place.category === 'restricted-lattice' || place.category === 'lattice-cluster' ? 160 : place.origin === 'neural-feed' ? 150 : place.origin === 'open-poi' && place.cluster ? 120 : place.origin === 'source' ? 100 : place.cluster ? 10 : 30,
+      zIndex: place.category === 'portx' || place.category === 'portx-cluster' ? 180 : place.category === 'conscience' || place.category === 'conscience-cluster' ? 178 : place.category === 'iplasma-c3' || place.category === 'iplasma-c3-cluster' ? 176 : place.category === 'operator' || place.category === 'operator-cluster' ? 175 : place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' || place.category === 'live-cluster' ? 170 : place.category === 'restricted-lattice' || place.category === 'lattice-cluster' ? 160 : place.origin === 'neural-feed' ? 150 : place.origin === 'open-poi' && place.cluster ? 120 : place.origin === 'source' ? 100 : place.cluster ? 10 : 30,
     });
     const currentPlace = () => [...callbacks.current.locations, ...callbacks.current.indexPlaces, ...callbacks.current.poiPlaces, ...callbacks.current.nearbyPlaces].find(item => item.id === place.id) || place;
     marker.addListener('click', () => {
@@ -115,6 +116,8 @@ export default function MapCanvas(props: Props) {
       : latest.category === 'operator' ? 'Operator feed · TPM-119 bridge · click for the readout'
       : latest.category === 'iplasma-c3-cluster' ? 'iPlasma C3 cluster · click to expand'
       : latest.category === 'iplasma-c3' ? 'iPlasma C3 alert · Interconnect CoreWeave · click for the readout'
+      : latest.category === 'conscience-cluster' ? 'Conscience cluster · click to expand'
+      : latest.category === 'conscience' ? 'TPM-119 AI conscience · CoreWeave · click for the readout'
       : latest.category === 'anaconda-cluster' ? 'Anaconda intelligence cluster · click to expand'
       : latest.category === 'anaconda' || latest.category === 'live-intelligence' ? 'Anaconda intelligence · NeuralLink lattice · click for the intel readout'
       : latest.category === 'lattice-cluster' ? 'Restricted Lattice partner cluster · click to expand'
@@ -157,6 +160,7 @@ export default function MapCanvas(props: Props) {
       const portx = place.category === 'portx' || place.category === 'portx-cluster';
       const operator = place.category === 'operator' || place.category === 'operator-cluster';
       const iplasma = place.category === 'iplasma-c3' || place.category === 'iplasma-c3-cluster';
+      const conscience = place.category === 'conscience' || place.category === 'conscience-cluster';
       const live = place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' || place.category === 'live-cluster';
       const poi = place.origin === 'open-poi' || neural;
       const bridgeCluster = !!place.cluster && place.origin === 'open-poi';
@@ -164,13 +168,13 @@ export default function MapCanvas(props: Props) {
       const indexed = place.origin === 'open-index' || place.origin === 'index-cluster';
       marker.setVisible((source || neural ? callbacks.current.sourceVisible : indexed || poi ? callbacks.current.indexVisible : callbacks.current.nearbyVisible) || selected);
       marker.setIcon(place.cluster ? clusterMarkerIcon(place.cluster.count, selected, place.marker?.color) : place.overview ? geographicOverviewIcon(selected) : markerIcon(source, selected, place.marker?.color));
-      marker.setZIndex(selected ? 1000 : portx ? 180 : iplasma ? 176 : operator ? 175 : live ? 170 : lattice ? 160 : neural ? 150 : bridgeCluster ? 120 : source ? 100 : stop ? 36 : poi ? 70 : place.cluster ? 10 : 30);
-      const showLabel = portx || operator || iplasma || !!place.cluster || selected || (neural ? zoom >= 2 : source ? zoom >= 7 : poi ? zoom >= 12 : indexed ? indexedLabels.has(place.id) : zoom >= 12);
+      marker.setZIndex(selected ? 1000 : portx ? 180 : conscience ? 178 : iplasma ? 176 : operator ? 175 : live ? 170 : lattice ? 160 : neural ? 150 : bridgeCluster ? 120 : source ? 100 : stop ? 36 : poi ? 70 : place.cluster ? 10 : 30);
+      const showLabel = portx || operator || iplasma || conscience || !!place.cluster || selected || (neural ? zoom >= 2 : source ? zoom >= 7 : poi ? zoom >= 12 : indexed ? indexedLabels.has(place.id) : zoom >= 12);
       marker.setLabel(showLabel ? {
-        text: portx || operator || iplasma || place.category === 'anaconda' || place.category === 'anaconda-cluster' ? (place.marker?.label || place.name) : place.cluster ? clusterMarkerLabel(place.cluster.count) : place.marker?.label || place.name,
-        color: portx ? '#c45a12' : iplasma ? '#d946ef' : operator ? '#be185d' : live ? '#1a4fbf' : lattice ? '#1e6b48' : neural ? '#5c3d8f' : bridgeCluster ? '#1e6b48' : source ? '#92304a' : poi ? '#24312c' : indexed ? '#396b94' : '#356d63',
+        text: portx || operator || iplasma || conscience || place.category === 'anaconda' || place.category === 'anaconda-cluster' ? (place.marker?.label || place.name) : place.cluster ? clusterMarkerLabel(place.cluster.count) : place.marker?.label || place.name,
+        color: portx ? '#c45a12' : conscience ? '#a16207' : iplasma ? '#d946ef' : operator ? '#be185d' : live ? '#1a4fbf' : lattice ? '#1e6b48' : neural ? '#5c3d8f' : bridgeCluster ? '#1e6b48' : source ? '#92304a' : poi ? '#24312c' : indexed ? '#396b94' : '#356d63',
         fontFamily: 'Manrope, sans-serif', fontSize: '11px', fontWeight: '700',
-        className: portx ? 'native-place-label portx' : iplasma ? 'native-place-label iplasma' : operator ? 'native-place-label operator' : place.cluster ? 'native-cluster-label' : `native-place-label ${source ? 'source' : live ? 'live' : lattice ? 'lattice' : neural ? 'neural' : poi ? 'poi' : indexed ? 'indexed' : 'provider'}`,
+        className: portx ? 'native-place-label portx' : conscience ? 'native-place-label conscience' : iplasma ? 'native-place-label iplasma' : operator ? 'native-place-label operator' : place.cluster ? 'native-cluster-label' : `native-place-label ${source ? 'source' : live ? 'live' : lattice ? 'lattice' : neural ? 'neural' : poi ? 'poi' : indexed ? 'indexed' : 'provider'}`,
       } : null);
     });
   };
@@ -234,6 +238,7 @@ export default function MapCanvas(props: Props) {
         heading: delta => map.setHeading((map.getHeading() || 0) + delta),
         level: () => { map.setTilt(0); map.setHeading(0); },
         world: () => map.fitBounds({ south: -80, north: 85, west: -180, east: 180 }, { top: 85, bottom: 70, left: innerWidth > 760 ? 335 : 40, right: 35 }),
+        restore: (lat, lng, zoom) => { map.panTo({ lat, lng }); map.setZoom(zoom); },
         fitSource: () => {
           if (!callbacks.current.locations.length) return;
           const bounds = new google.maps.LatLngBounds();
@@ -241,7 +246,11 @@ export default function MapCanvas(props: Props) {
           map.fitBounds(bounds, { top: 100, bottom: 100, left: innerWidth > 760 ? 420 : 40, right: 60 });
         },
       });
-      map.fitBounds({ south: -80, north: 85, west: -180, east: 180 }, { top: 85, bottom: 70, left: innerWidth > 760 ? 335 : 40, right: 35 });
+      const saved = readSavedCamera();
+      if (saved) {
+        map.panTo({ lat: saved.lat, lng: saved.lng });
+        map.setZoom(saved.zoom);
+      } else map.fitBounds({ south: -80, north: 85, west: -180, east: 180 }, { top: 85, bottom: 70, left: innerWidth > 760 ? 335 : 40, right: 35 });
       setReady(true); setError('');
     }).catch(e => { if (active) setError(e.message); });
     return () => {
@@ -340,16 +349,18 @@ export default function MapCanvas(props: Props) {
       interconnectHandles.current = [];
     };
     let signature = '';
+    let moving = false;
     const draw = () => {
       const map = mapRef.current;
-      if (!map) return;
+      if (!map || moving) return;
       const centerPoint = map.getCenter();
       const center = { lat: centerPoint?.lat() ?? 0, lng: centerPoint?.lng() ?? 0 };
       const propsNow = callbacks.current;
-      const graph = interconnectGraph([...propsNow.locations, ...propsNow.indexPlaces, ...propsNow.poiPlaces], center);
-      const next = graph.handles.map(handle => `${handle.readout}:${handle.lat.toFixed(3)}:${handle.lng.toFixed(3)}`).join('|');
-      if (next === signature) return;
-      signature = next;
+      const places = [...propsNow.locations, ...propsNow.indexPlaces, ...propsNow.poiPlaces];
+      const pinKey = places.filter(place => place.category === 'conscience' || place.category === 'conscience-cluster' || place.category === 'interconnect-fusion').map(place => `${place.id}:${place.lat.toFixed(3)}:${place.lng.toFixed(3)}:${place.name}`).sort().join('|');
+      if (pinKey === signature) return;
+      signature = pinKey;
+      const graph = interconnectGraph(places, center);
       clear();
       for (const edge of graph.edges) {
         interconnectLines.current.push(new google.maps.Polyline({
@@ -378,10 +389,12 @@ export default function MapCanvas(props: Props) {
     draw();
     const timer = window.setInterval(draw, 1000);
     const map = mapRef.current;
-    const listener = map?.addListener('idle', draw);
+    const dragStart = map?.addListener('dragstart', () => { moving = true; });
+    const dragEnd = map?.addListener('dragend', () => { moving = false; draw(); });
     return () => {
       window.clearInterval(timer);
-      listener?.remove();
+      dragStart?.remove();
+      dragEnd?.remove();
       clear();
     };
   }, [ready]);

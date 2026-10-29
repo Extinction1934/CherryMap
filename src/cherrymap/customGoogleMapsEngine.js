@@ -694,7 +694,8 @@ class CustomGoogleMap extends Emitter {
   }
 
   _renderPolylines() {
-    while (this._svgOverlay.firstChild) this._svgOverlay.removeChild(this._svgOverlay.firstChild);
+    const svg = this._svgOverlay;
+    if (!svg) return;
     for (const poly of this._polylines) {
       if (!poly._map || !poly._path?.length) continue;
       const pts = poly._path.map(p => {
@@ -703,27 +704,34 @@ class CustomGoogleMap extends Emitter {
         const px = this._latLngToContainerPixel(lat, lng);
         return `${px.x.toFixed(1)},${px.y.toFixed(1)}`;
       }).join(' ');
-      const el = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-      el.setAttribute('points', pts);
-      el.setAttribute('fill', 'none');
-      el.setAttribute('stroke', poly._strokeColor || '#b92d49');
-      el.setAttribute('stroke-opacity', String(poly._strokeOpacity ?? 0.9));
-      el.setAttribute('stroke-width', String(poly._strokeWeight ?? 5));
-      el.setAttribute('stroke-linecap', 'round');
-      el.setAttribute('stroke-linejoin', 'round');
-      if (poly._dashed) {
-        const glow = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-        glow.setAttribute('points', pts);
-        glow.setAttribute('fill', 'none');
-        glow.setAttribute('stroke', poly._strokeColor || '#b92d49');
-        glow.setAttribute('stroke-opacity', '0.35');
-        glow.setAttribute('stroke-width', String((poly._strokeWeight ?? 2) + 4));
-        glow.setAttribute('stroke-linecap', 'round');
-        this._svgOverlay.appendChild(glow);
-        el.setAttribute('class', 'interconnect-cable');
-        el.setAttribute('stroke-dasharray', '1.6 7');
+      if (!poly._svgNodes) {
+        const nodes = [];
+        if (poly._dashed) {
+          const glow = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+          glow.setAttribute('fill', 'none');
+          glow.setAttribute('stroke', poly._strokeColor || '#b92d49');
+          glow.setAttribute('stroke-opacity', '0.35');
+          glow.setAttribute('stroke-width', String((poly._strokeWeight ?? 2) + 4));
+          glow.setAttribute('stroke-linecap', 'round');
+          svg.appendChild(glow);
+          nodes.push(glow);
+        }
+        const el = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        el.setAttribute('fill', 'none');
+        el.setAttribute('stroke', poly._strokeColor || '#b92d49');
+        el.setAttribute('stroke-opacity', String(poly._strokeOpacity ?? 0.9));
+        el.setAttribute('stroke-width', String(poly._strokeWeight ?? 5));
+        el.setAttribute('stroke-linecap', 'round');
+        el.setAttribute('stroke-linejoin', 'round');
+        if (poly._dashed) {
+          el.setAttribute('class', 'interconnect-cable');
+          el.setAttribute('stroke-dasharray', '1.6 7');
+        }
+        svg.appendChild(el);
+        nodes.push(el);
+        poly._svgNodes = nodes;
       }
-      this._svgOverlay.appendChild(el);
+      for (const node of poly._svgNodes) node.setAttribute('points', pts);
     }
   }
 
@@ -1027,12 +1035,13 @@ class Polyline extends Emitter {
     if (this._map === map) return;
     if (this._map) {
       this._map._polylines.delete(this);
-      this._map._renderPolylines();
+      this._svgNodes?.forEach(node => node.remove());
+      this._svgNodes = null;
     }
     this._map = map;
     if (map) {
       map._polylines.add(this);
-      map._renderPolylines();
+      map._scheduleRender();
     }
   }
 }

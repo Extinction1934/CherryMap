@@ -210,4 +210,5 @@ export interface MapActions {
   level: () => void;
   world: () => void;
   fitSource: () => void;
+  restore: (lat: number, lng: number, zoom: number) => void;
 }

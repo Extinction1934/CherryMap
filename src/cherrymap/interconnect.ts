@@ -18,7 +18,33 @@ export interface InterconnectGraph {
   handles: InterconnectHandle[];
 }
 
-const COLORS = ['#b92d49', '#396b94', '#1e6b48', '#5c3d8f', '#1a4fbf', '#e36a12', '#0f766e'];
+const COLORS = ['#b92d49', '#396b94', '#1e6b48', '#5c3d8f', '#1a4fbf', '#e36a12', '#0f766e', '#ca8a04'];
+
+const ANCHORS: { color: string; test: (place: Place) => boolean }[] = [
+  { color: '#5c3d8f', test: place => place.category === 'neural-feed' || place.category === 'neural-cluster' },
+  { color: '#1e6b48', test: place => place.category === 'restricted-lattice' || place.category === 'lattice-cluster' },
+  { color: '#1a4fbf', test: place => place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' || place.category === 'live-cluster' },
+  { color: '#e36a12', test: place => place.category === 'portx' || place.category === 'portx-cluster' },
+  { color: '#be185d', test: place => place.category === 'operator' || place.category === 'operator-cluster' },
+  { color: '#d946ef', test: place => place.category === 'iplasma-c3' || place.category === 'iplasma-c3-cluster' },
+  { color: '#0f766e', test: place => place.category === 'interconnect-fusion' },
+  { color: '#24312c', test: place => place.origin === 'open-poi' },
+  { color: '#396b94', test: place => place.origin === 'open-index' || place.origin === 'index-cluster' },
+  { color: '#b92d49', test: place => place.origin === 'source' },
+];
+
+function nearest(origin: { lat: number; lng: number }, anchors: { lat: number; lng: number }[]) {
+  let best = anchors[0];
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const anchor of anchors) {
+    const distance = (anchor.lat - origin.lat) ** 2 + (anchor.lng - origin.lng) ** 2;
+    if (distance < bestDistance) {
+      best = anchor;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
 
 function ring(handles: InterconnectHandle[]): InterconnectEdge[] {
   if (handles.length < 2) return [];
@@ -48,6 +74,27 @@ export function interconnectGraph(places: Place[], center: { lat: number; lng: n
       color: '#0f766e',
     }))
     .filter(handle => handle.readout.length > 0)
-    .sort((a, b) => Math.atan2(a.lng - center.lng, a.lat - center.lat) - Math.atan2(b.lng - center.lng, b.lat - center.lat));
-  return { edges: ring(handles), handles };
+    .sort((a, b) => a.lat - b.lat || a.lng - b.lng);
+  let conscience = places
+    .filter(place => (place.category === 'conscience' || place.category === 'conscience-cluster') && Number.isFinite(place.lat) && Number.isFinite(place.lng))
+    .map(place => ({ lat: place.lat, lng: place.lng }))
+    .sort((a, b) => a.lat - b.lat || a.lng - b.lng);
+  if (conscience.length > 36) {
+    conscience = [...conscience].sort((a, b) => ((a.lat - center.lat) ** 2 + (a.lng - center.lng) ** 2) - ((b.lat - center.lat) ** 2 + (b.lng - center.lng) ** 2)).slice(0, 36);
+  }
+  const edges = ring(handles);
+  const conscienceHandles = conscience.map(pin => ({ lat: pin.lat, lng: pin.lng, readout: '', detail: '', color: '#ca8a04' }));
+  edges.push(...ring(conscienceHandles).map(edge => ({ ...edge, color: '#ca8a04' })));
+  const families = ANCHORS.map(anchor => ({
+    color: anchor.color,
+    points: places.filter(place => anchor.test(place) && Number.isFinite(place.lat) && Number.isFinite(place.lng)).map(place => ({ lat: place.lat, lng: place.lng })),
+  })).filter(family => family.points.length > 0);
+  for (const pin of conscience) {
+    for (const family of families) {
+      const anchor = nearest(pin, family.points);
+      if (Math.abs(anchor.lat - pin.lat) < 1e-6 && Math.abs(anchor.lng - pin.lng) < 1e-6) continue;
+      edges.push({ path: [{ lat: pin.lat, lng: pin.lng }, { lat: anchor.lat, lng: anchor.lng }], color: family.color });
+    }
+  }
+  return { edges, handles };
 }
