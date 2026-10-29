@@ -65,7 +65,7 @@ async def security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "same-origin"
-    response.headers["Permissions-Policy"] = "geolocation=(self)"
+    response.headers["Permissions-Policy"] = "geolocation=*"
     # Do not set X-Frame-Options or frame-ancestors: the approved app must not
     # block cross-site iframe embedding.
     response.headers["Cache-Control"] = "no-store" if request.url.path.startswith("/api/") or request.url.path == "/_app/health" else "no-cache"

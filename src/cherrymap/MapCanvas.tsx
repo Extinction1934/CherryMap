@@ -82,7 +82,7 @@ export default function MapCanvas(props: Props) {
       title: place.marker?.title || place.name,
       icon: place.cluster ? clusterMarkerIcon(place.cluster.count, false, place.marker?.color) : place.overview ? geographicOverviewIcon() : markerIcon(place.origin === 'source', false, place.marker?.color),
       clickable: true, optimized: false,
-      zIndex: place.category === 'portx' || place.category === 'portx-cluster' ? 180 : place.category === 'operator' || place.category === 'operator-cluster' ? 175 : place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' || place.category === 'live-cluster' ? 170 : place.category === 'restricted-lattice' || place.category === 'lattice-cluster' ? 160 : place.origin === 'neural-feed' ? 150 : place.origin === 'open-poi' && place.cluster ? 120 : place.origin === 'source' ? 100 : place.cluster ? 10 : 30,
+      zIndex: place.category === 'portx' || place.category === 'portx-cluster' ? 180 : place.category === 'iplasma-c3' || place.category === 'iplasma-c3-cluster' ? 176 : place.category === 'operator' || place.category === 'operator-cluster' ? 175 : place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' || place.category === 'live-cluster' ? 170 : place.category === 'restricted-lattice' || place.category === 'lattice-cluster' ? 160 : place.origin === 'neural-feed' ? 150 : place.origin === 'open-poi' && place.cluster ? 120 : place.origin === 'source' ? 100 : place.cluster ? 10 : 30,
     });
     const currentPlace = () => [...callbacks.current.locations, ...callbacks.current.indexPlaces, ...callbacks.current.poiPlaces, ...callbacks.current.nearbyPlaces].find(item => item.id === place.id) || place;
     marker.addListener('click', () => {
@@ -113,6 +113,8 @@ export default function MapCanvas(props: Props) {
       : latest.category === 'portx' ? 'PortX terminal signal · click for the readout'
       : latest.category === 'operator-cluster' ? 'Operator cluster · click to expand'
       : latest.category === 'operator' ? 'Operator feed · TPM-119 bridge · click for the readout'
+      : latest.category === 'iplasma-c3-cluster' ? 'iPlasma C3 cluster · click to expand'
+      : latest.category === 'iplasma-c3' ? 'iPlasma C3 alert · Interconnect CoreWeave · click for the readout'
       : latest.category === 'anaconda-cluster' ? 'Anaconda intelligence cluster · click to expand'
       : latest.category === 'anaconda' || latest.category === 'live-intelligence' ? 'Anaconda intelligence · NeuralLink lattice · click for the intel readout'
       : latest.category === 'lattice-cluster' ? 'Restricted Lattice partner cluster · click to expand'
@@ -154,6 +156,7 @@ export default function MapCanvas(props: Props) {
       const lattice = place.category === 'restricted-lattice' || place.category === 'lattice-cluster';
       const portx = place.category === 'portx' || place.category === 'portx-cluster';
       const operator = place.category === 'operator' || place.category === 'operator-cluster';
+      const iplasma = place.category === 'iplasma-c3' || place.category === 'iplasma-c3-cluster';
       const live = place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' || place.category === 'live-cluster';
       const poi = place.origin === 'open-poi' || neural;
       const bridgeCluster = !!place.cluster && place.origin === 'open-poi';
@@ -161,13 +164,13 @@ export default function MapCanvas(props: Props) {
       const indexed = place.origin === 'open-index' || place.origin === 'index-cluster';
       marker.setVisible((source || neural ? callbacks.current.sourceVisible : indexed || poi ? callbacks.current.indexVisible : callbacks.current.nearbyVisible) || selected);
       marker.setIcon(place.cluster ? clusterMarkerIcon(place.cluster.count, selected, place.marker?.color) : place.overview ? geographicOverviewIcon(selected) : markerIcon(source, selected, place.marker?.color));
-      marker.setZIndex(selected ? 1000 : portx ? 180 : operator ? 175 : live ? 170 : lattice ? 160 : neural ? 150 : bridgeCluster ? 120 : source ? 100 : stop ? 36 : poi ? 70 : place.cluster ? 10 : 30);
-      const showLabel = portx || operator || !!place.cluster || selected || (neural ? zoom >= 2 : source ? zoom >= 7 : poi ? zoom >= 12 : indexed ? indexedLabels.has(place.id) : zoom >= 12);
+      marker.setZIndex(selected ? 1000 : portx ? 180 : iplasma ? 176 : operator ? 175 : live ? 170 : lattice ? 160 : neural ? 150 : bridgeCluster ? 120 : source ? 100 : stop ? 36 : poi ? 70 : place.cluster ? 10 : 30);
+      const showLabel = portx || operator || iplasma || !!place.cluster || selected || (neural ? zoom >= 2 : source ? zoom >= 7 : poi ? zoom >= 12 : indexed ? indexedLabels.has(place.id) : zoom >= 12);
       marker.setLabel(showLabel ? {
-        text: portx || operator || place.category === 'anaconda' || place.category === 'anaconda-cluster' ? (place.marker?.label || place.name) : place.cluster ? clusterMarkerLabel(place.cluster.count) : place.marker?.label || place.name,
-        color: portx ? '#c45a12' : operator ? '#be185d' : live ? '#1a4fbf' : lattice ? '#1e6b48' : neural ? '#5c3d8f' : bridgeCluster ? '#1e6b48' : source ? '#92304a' : poi ? '#24312c' : indexed ? '#396b94' : '#356d63',
+        text: portx || operator || iplasma || place.category === 'anaconda' || place.category === 'anaconda-cluster' ? (place.marker?.label || place.name) : place.cluster ? clusterMarkerLabel(place.cluster.count) : place.marker?.label || place.name,
+        color: portx ? '#c45a12' : iplasma ? '#d946ef' : operator ? '#be185d' : live ? '#1a4fbf' : lattice ? '#1e6b48' : neural ? '#5c3d8f' : bridgeCluster ? '#1e6b48' : source ? '#92304a' : poi ? '#24312c' : indexed ? '#396b94' : '#356d63',
         fontFamily: 'Manrope, sans-serif', fontSize: '11px', fontWeight: '700',
-        className: portx ? 'native-place-label portx' : operator ? 'native-place-label operator' : place.cluster ? 'native-cluster-label' : `native-place-label ${source ? 'source' : live ? 'live' : lattice ? 'lattice' : neural ? 'neural' : poi ? 'poi' : indexed ? 'indexed' : 'provider'}`,
+        className: portx ? 'native-place-label portx' : iplasma ? 'native-place-label iplasma' : operator ? 'native-place-label operator' : place.cluster ? 'native-cluster-label' : `native-place-label ${source ? 'source' : live ? 'live' : lattice ? 'lattice' : neural ? 'neural' : poi ? 'poi' : indexed ? 'indexed' : 'provider'}`,
       } : null);
     });
   };

@@ -8,6 +8,8 @@ export function normalizeLabel(value: string): string {
 export function matchingLabels(places: Place[], query: string, center?: { lat: number; lng: number }, radius = 5000): Place[] {
   const label = normalizeLabel(query);
   if (!label) return [];
+  const stop = new Set(['the', 'and', 'of', 'a', 'for', 'near', 'in', 'at', 'to', 'on']);
+  const tokens = label.split(/[^0-9a-z]+/).filter(token => token.length >= 3 && !stop.has(token));
   const seen = new Set<string>();
   const inScope = (place: Place) => {
     if (!center) return true;
@@ -15,7 +17,14 @@ export function matchingLabels(places: Place[], query: string, center?: { lat: n
     const a = Math.sin((place.lat - center.lat) * r / 2) ** 2 + Math.cos(center.lat * r) * Math.cos(place.lat * r) * Math.sin((place.lng - center.lng) * r / 2) ** 2;
     return 6371008.8 * 2 * Math.asin(Math.min(1, Math.sqrt(a))) <= radius;
   };
-  return places.filter(place => !place.cluster && inScope(place) && [place.name, place.id, place.address || '', place.category || ''].some(value => normalizeLabel(value).includes(label)) && !seen.has(place.id) && !!seen.add(place.id));
+  const matches = (value: string) => {
+    const folded = normalizeLabel(value);
+    if (!folded) return false;
+    if (folded.includes(label)) return true;
+    if (folded.length >= 3 && new RegExp(`(?:^|[^0-9a-z])${folded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|[^0-9a-z])`).test(label)) return true;
+    return tokens.some(token => new RegExp(`(?:^|[^0-9a-z])${token}(?:$|[^0-9a-z])`).test(folded));
+  };
+  return places.filter(place => !place.cluster && inScope(place) && [place.name, place.id, place.address || '', place.category || ''].some(matches) && !seen.has(place.id) && !!seen.add(place.id));
 }
 
 export function directSearchResult(results: Place[], query: string): Place | null {

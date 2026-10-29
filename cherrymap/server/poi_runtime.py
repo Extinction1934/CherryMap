@@ -854,7 +854,10 @@ class MemoryPoiRepository:
             name = str(row[1])
             identifier = str(row[0])
             if folded not in name.casefold() and folded not in identifier.casefold():
-                continue
+                tokens = [part for part in folded.split() if len(part) >= 3]
+                folded_name = name.casefold()
+                if not (len(folded_name) >= 3 and folded_name in folded) and not any(part in folded_name or part in identifier.casefold() for part in tokens):
+                    continue
             if lat is not None and lng is not None and radius is not None:
                 # Same haversine the label search applies again on accepted records.
                 p = math.pi / 180

@@ -10,6 +10,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { httpEquiv: "Permissions-Policy", content: "geolocation=*" },
       { title: APP_NAME },
       { name: "description", content: "CherryMap — source annotations, geographic index, and the TPM-119 software bridge on a custom map." },
       { name: "theme-color", content: "#b92d49" },

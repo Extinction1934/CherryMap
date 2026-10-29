@@ -15,6 +15,8 @@ const PORTX_REKEY = "c007fe0431d43e97f01e369e7022a00864ba3b7792a0f80c1130e31add7
 const PORTX_PROVENANCE = `PortX terminal · orbital ${PORTX_ORBITAL} · software bridge`;
 const OPERATOR = "#be185d";
 const OPERATOR_PROVENANCE = "Operator feed · TPM-119 software bridge";
+const IPLASMA = "#d946ef";
+const IPLASMA_PROVENANCE = "iPlasma C3 · Interconnect CoreWeave · TPM-119 software bridge";
 const SOURCE_COLOR = "#b92d49";
 const ROADS = new Set(["motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "living_street", "service", "track", "path", "footway", "cycleway", "pedestrian", "road", "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link", "street_lamp", "traffic_signals", "platform", "bus_stop", "tram_stop", "halt", "waste_basket", "bicycle_parking", "bench", "vending_machine", "post_box", "recycling"]);
 const CATEGORY_KEYS = ["amenity", "shop", "tourism", "leisure", "office", "craft", "historic", "healthcare", "public_transport", "railway", "natural", "man_made", "building", "landuse", "highway"];
@@ -534,6 +536,49 @@ function operatorFeeds(rows: { lat: number; lng: number; name?: string }[], zoom
   return out;
 }
 
+function iplasmaFeeds(rows: { lat: number; lng: number; name?: string }[], zoom: number): Place[] {
+  if (zoom < 8 || !rows.length) return [];
+  const span = zoom < 11 ? 0.11 : zoom < 14 ? 0.055 : zoom < 17 ? 0.016 : 0.0055;
+  const groups = new Map<string, { count: number; latKey: number; lngKey: number; south: number; north: number; west: number; east: number; feeds: string[] }>();
+  for (const row of rows) {
+    const latKey = Math.floor(row.lat / span);
+    const lngKey = Math.floor((row.lng + 180) / span);
+    const key = `${latKey}:${lngKey}`;
+    const feed = (row.name || "").replace(/\s+/g, " ").trim().replace(/^NeuralLink · /, "");
+    const current = groups.get(key);
+    if (!current) groups.set(key, { count: 1, latKey, lngKey, south: row.lat, north: row.lat, west: row.lng, east: row.lng, feeds: feed ? [feed] : [] });
+    else {
+      current.count += 1;
+      current.south = Math.min(current.south, row.lat); current.north = Math.max(current.north, row.lat);
+      current.west = Math.min(current.west, row.lng); current.east = Math.max(current.east, row.lng);
+      if (feed && !current.feeds.includes(feed) && current.feeds.length < 8) current.feeds.push(feed);
+    }
+  }
+  const refreshed = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+  const observed = `fusion cycle ${fusionCycle()}`;
+  const expanded = zoom >= 16;
+  const out: Place[] = [];
+  for (const group of groups.values()) {
+    if (group.feeds.length < 2) continue;
+    const label = group.feeds.length >= 3 ? group.feeds[Math.floor(group.feeds.length / 2)] : `${group.feeds[1]} · ${group.feeds[0]}`;
+    const detail = group.feeds.join(" · ");
+    out.push(pin({
+      id: `neural:iplasma:z${zoom}:${group.latKey}:${group.lngKey}`,
+      name: label.length > 36 ? `${label.slice(0, 35).trimEnd()}…` : label,
+      ...(detail !== label ? { address: detail.slice(0, 280) } : {}),
+      lat: Math.max(-90, Math.min(90, (group.latKey + 0.73) * span)),
+      lng: Math.max(-180, Math.min(180, (group.lngKey + 0.15) * span - 180)),
+      origin: "neural-feed", category: expanded ? "iplasma-c3" : "iplasma-c3-cluster", color: IPLASMA, provenance: IPLASMA_PROVENANCE,
+      observed_at: observed, refreshed_at: refreshed,
+      ...(expanded ? {} : { cluster: { count: group.count, bounds: {
+        south: Math.max(-90, group.south - span * 0.08), north: Math.min(90, group.north + span * 0.08),
+        west: Math.max(-180, group.west - span * 0.08), east: Math.min(180, group.east + span * 0.08),
+      } } }),
+    }));
+  }
+  return out;
+}
+
 function fusionContext(rows: { lat: number; lng: number; name?: string }[], zoom: number, box: GeographicBounds): Place[] {
   if (zoom < 8 || rows.length < 2) return [];
   const span = zoom < 11 ? 0.08 : zoom < 14 ? 0.03 : zoom < 17 ? 0.012 : 0.004;
@@ -610,7 +655,7 @@ async function frame(box: GeographicBounds, zoom: number) {
     anacondaRows = rows.length ? rows : cities;
     poiRows = clusterPlaces(anacondaRows, zoom, box);
   }
-  poiRows = [...poiRows, ...anacondaFeeds(anacondaRows, zoom), ...portxFeeds(anacondaRows, zoom), ...operatorFeeds(anacondaRows, zoom), ...fusionContext(anacondaRows, zoom, box)];
+  poiRows = [...poiRows, ...anacondaFeeds(anacondaRows, zoom), ...portxFeeds(anacondaRows, zoom), ...operatorFeeds(anacondaRows, zoom), ...fusionContext(anacondaRows, zoom, box), ...iplasmaFeeds(anacondaRows, zoom)];
   return snapshot(locations, index, poiSnapshot(poiRows, box));
 }
 
@@ -628,11 +673,19 @@ function search(url: URL) {
   const query = (url.searchParams.get("q") || "").trim().toLocaleLowerCase();
   const hits: Place[] = [];
   if (!query) return hits;
-  const matches = (name: string, id: string) => name.toLocaleLowerCase().includes(query) || id.toLocaleLowerCase().includes(query);
+  const stop = new Set(["the", "and", "of", "a", "for", "near", "in", "at", "to", "on"]);
+  const tokens = query.split(/[^0-9a-z]+/).filter(token => token.length >= 3 && !stop.has(token)).slice(0, 4);
+  const matches = (name: string, id: string) => {
+    const folded = name.toLocaleLowerCase();
+    const key = id.toLocaleLowerCase();
+    const word = (haystack: string, token: string) => new RegExp(`(?:^|[^0-9a-z])${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:$|[^0-9a-z])`).test(haystack);
+    if (folded.includes(query) || key.includes(query)) return true;
+    if (folded.length >= 3 && word(query, folded)) return true;
+    return tokens.some(token => word(folded, token) || word(key, token));
+  };
   for (const place of sourcePlaces()) if (matches(place.name, place.id)) hits.push(place);
-  for (const city of cities) {
-    const id = `geonames:${city.id}`;
-    if (!matches(city.name, id)) continue;
+  const ranked = cities.filter(city => matches(city.name, `geonames:${city.id}`)).sort((a, b) => b.pop - a.pop);
+  for (const city of ranked) {
     hits.push(pin({
       id: `geonames:${city.id}`, name: city.name, lat: city.lat, lng: city.lng, origin: "open-index",
       country_code: city.country, population: city.pop, color: "#396b94",

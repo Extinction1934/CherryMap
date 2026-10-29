@@ -7,7 +7,7 @@ import { retainsGeographicFrame } from './geographicFrameState';
 import type { Bootstrap, GeographicBounds, IndexSnapshot, MarkerFusion, MarkerSnapshot, MarkerWorkerStatus, NearbyState, Place, POISnapshot, ViewState } from './types';
 
 function isStreetPin(place: Place) {
-  if (place.category === 'live-cluster' || place.category === 'portx' || place.category === 'portx-cluster' || place.category === 'operator' || place.category === 'operator-cluster') return false;
+  if (place.category === 'live-cluster' || place.category === 'portx' || place.category === 'portx-cluster' || place.category === 'operator' || place.category === 'operator-cluster' || place.category === 'iplasma-c3' || place.category === 'iplasma-c3-cluster') return false;
   return (place.origin === 'open-poi' || place.origin === 'neural-feed') && !place.cluster;
 }
 
@@ -170,7 +170,7 @@ export default function useMarkerRuntime(bootstrap: Bootstrap | null, view: View
             const current = viewRef.current;
             const kept = retainStreetPins(poiPlacesRef.current, snapshot.poi.places, current.zoom, current.bounds);
             const nextPoiSignature = placeSignature(kept);
-            const liveStamp = kept.filter(place => place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' || place.category === 'portx' || place.category === 'portx-cluster' || place.category === 'operator' || place.category === 'operator-cluster' || place.category === 'interconnect-fusion').map(place => `${place.id}:${place.refreshed_at || ''}:${place.observed_at || ''}`).join('|');
+            const liveStamp = kept.filter(place => place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' || place.category === 'portx' || place.category === 'portx-cluster' || place.category === 'operator' || place.category === 'operator-cluster' || place.category === 'iplasma-c3' || place.category === 'iplasma-c3-cluster' || place.category === 'interconnect-fusion').map(place => `${place.id}:${place.refreshed_at || ''}:${place.observed_at || ''}`).join('|');
             // Same pins already on the map. Do not swap the array — that
             // removes and recreates every marker, which reads as a blink.
             if (poiSignature.current !== nextPoiSignature) {
@@ -186,8 +186,8 @@ export default function useMarkerRuntime(bootstrap: Bootstrap | null, view: View
               });
             } else if (liveStamp && liveStamp !== liveSignature.current) {
               liveSignature.current = liveStamp;
-              const incoming = new Map(snapshot.poi.places.filter(place => place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' || place.category === 'portx' || place.category === 'portx-cluster' || place.category === 'operator' || place.category === 'operator-cluster' || place.category === 'interconnect-fusion').map(place => [place.id, place]));
-              const refreshed = kept.map(place => place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' || place.category === 'portx' || place.category === 'portx-cluster' || place.category === 'operator' || place.category === 'operator-cluster' || place.category === 'interconnect-fusion' ? incoming.get(place.id) || place : place);
+              const incoming = new Map(snapshot.poi.places.filter(place => place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' || place.category === 'portx' || place.category === 'portx-cluster' || place.category === 'operator' || place.category === 'operator-cluster' || place.category === 'iplasma-c3' || place.category === 'iplasma-c3-cluster' || place.category === 'interconnect-fusion').map(place => [place.id, place]));
+              const refreshed = kept.map(place => place.category === 'anaconda' || place.category === 'anaconda-cluster' || place.category === 'live-intelligence' || place.category === 'portx' || place.category === 'portx-cluster' || place.category === 'operator' || place.category === 'operator-cluster' || place.category === 'iplasma-c3' || place.category === 'iplasma-c3-cluster' || place.category === 'interconnect-fusion' ? incoming.get(place.id) || place : place);
               poiPlacesRef.current = refreshed;
               setPoi(previous => previous ? { ...previous, places: refreshed } : previous);
             } else if (kept.length) {

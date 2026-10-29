@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import re
 import unicodedata
 from datetime import UTC, datetime
 from typing import Any
@@ -18,6 +19,33 @@ def _distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     p = math.pi / 180
     a = math.sin((lat2-lat1)*p/2)**2 + math.cos(lat1*p)*math.cos(lat2*p)*math.sin((lng2-lng1)*p/2)**2
     return 6371008.8 * 2 * math.asin(min(1.0, math.sqrt(a)))
+
+
+def _tokens(q: str) -> list[str]:
+    stop = {"the", "and", "of", "a", "for", "near", "in", "at", "to", "on"}
+    seen: list[str] = []
+    for part in re.split(r"[^0-9A-Za-z]+", q):
+        token = part.casefold()
+        if len(token) >= 3 and token not in stop and token not in seen:
+            seen.append(token)
+        if len(seen) >= 4:
+            break
+    return seen
+
+
+def _word(haystack: str, token: str) -> bool:
+    return re.search(rf"(?<![0-9a-z]){re.escape(token)}(?![0-9a-z])", haystack) is not None
+
+
+def _query_hit(query: str, name: str, identifier: str) -> bool:
+    folded = _fold(query)
+    folded_name = _fold(name)
+    folded_id = _fold(identifier)
+    if folded in folded_name or folded in folded_id:
+        return True
+    if len(folded_name) >= 3 and _word(folded, folded_name):
+        return True
+    return any(_word(folded_name, token) or _word(folded_id, token) for token in _tokens(query))
 
 
 def _like(q: str) -> str:
@@ -66,7 +94,21 @@ class LabelSearch:
             connection = self.geo._connect()
             try:
                 with connection.cursor() as cursor:
-                    cursor.execute("SELECT geoname_id,name,latitude,longitude,country_code,feature_code,population,modification_date FROM geo_places WHERE (name LIKE %s ESCAPE '=' OR CAST(geoname_id AS CHAR) = %s)" + scope + " ORDER BY population DESC, geoname_id ASC LIMIT 30", (_like(q), q.removeprefix("geonames:"), *params))
+                    clauses = ["name LIKE %s ESCAPE '='", "CAST(geoname_id AS CHAR) = %s"]
+                    args: list[object] = [_like(q), q.removeprefix("geonames:")]
+                    for token in _tokens(q):
+                        if token == q.casefold():
+                            continue
+                        clauses.append("name LIKE %s ESCAPE '='")
+                        args.append(_like(token))
+                    cursor.execute(
+                        "SELECT geoname_id,name,latitude,longitude,country_code,feature_code,population,modification_date FROM geo_places WHERE ("
+                        + " OR ".join(clauses)
+                        + ")"
+                        + scope
+                        + " ORDER BY population DESC, geoname_id ASC LIMIT 30",
+                        (*args, *params),
+                    )
                     for row in cursor.fetchall():
                         name = str(row[1])
                         rows.append({"id": f"geonames:{row[0]}", "name": name, "lat": row[2], "lng": row[3], "origin": "open-index", "country_code": row[4], "population": int(row[6]), "overview": False, "category": row[5], "data_modified_at": str(row[7]), "refreshed_at": stamp, "marker": {"title": name, "label": name, "color": "#467da6", "popup": {"heading": name, "provenance": "GeoNames cities500 · CC BY 4.0 · database label search"}}})
@@ -85,7 +127,21 @@ class LabelSearch:
                 connection = self.poi._connect()
                 try:
                     with connection.cursor() as cursor:
-                        cursor.execute("SELECT osm_key,name,latitude,longitude,category,address,tag_fields_json,data_modified_at,retrieved_at FROM open_poi_places WHERE (name LIKE %s ESCAPE '=' OR osm_key LIKE %s ESCAPE '=')" + scope + " ORDER BY name ASC LIMIT 30", (_like(q), _like(q), *params))
+                        poi_clauses = ["name LIKE %s ESCAPE '='", "osm_key LIKE %s ESCAPE '='"]
+                        poi_args: list[object] = [_like(q), _like(q)]
+                        for token in _tokens(q):
+                            if token == q.casefold():
+                                continue
+                            poi_clauses.append("name LIKE %s ESCAPE '='")
+                            poi_args.append(_like(token))
+                        cursor.execute(
+                            "SELECT osm_key,name,latitude,longitude,category,address,tag_fields_json,data_modified_at,retrieved_at FROM open_poi_places WHERE ("
+                            + " OR ".join(poi_clauses)
+                            + ")"
+                            + scope
+                            + " ORDER BY name ASC LIMIT 30",
+                            (*poi_args, *params),
+                        )
                         rows.extend(POIRuntime._row_marker(row) for row in cursor.fetchall())
                 finally:
                     connection.close()
@@ -108,7 +164,7 @@ class LabelSearch:
             record = _safe_record(raw, family=family, known_source_ids=known)
             if record is None:
                 return
-            if matching and folded not in _fold(str(record["name"])) and folded not in _fold(str(record["id"])):
+            if matching and not _query_hit(text, str(record["name"]), str(record["id"])):
                 return
             if la is not None and lo is not None and rad is not None and _distance_m(la, lo, float(record["lat"]), float(record["lng"])) > rad:
                 return
