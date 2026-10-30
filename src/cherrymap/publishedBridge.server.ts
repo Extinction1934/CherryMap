@@ -19,6 +19,8 @@ const IPLASMA = "#d946ef";
 const IPLASMA_PROVENANCE = "iPlasma C3 · Interconnect CoreWeave · TPM-119 software bridge";
 const CONSCIENCE = "#ca8a04";
 const CONSCIENCE_PROVENANCE = "TPM-119 AI · Conscience Interconnect CoreWeave · software bridge";
+const AICP = "#0369a1";
+const AICP_PROVENANCE = "TPM-119 AICP · Apple Inc. source worker · Apple Intelligence Conscience Processor v2.0 · Conscience Interconnect CoreWeave";
 const SOURCE_COLOR = "#b92d49";
 const ROADS = new Set(["motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "living_street", "service", "track", "path", "footway", "cycleway", "pedestrian", "road", "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link", "street_lamp", "traffic_signals", "platform", "bus_stop", "tram_stop", "halt", "waste_basket", "bicycle_parking", "bench", "vending_machine", "post_box", "recycling"]);
 const CATEGORY_KEYS = ["amenity", "shop", "tourism", "leisure", "office", "craft", "historic", "healthcare", "public_transport", "railway", "natural", "man_made", "building", "landuse", "highway"];
@@ -657,7 +659,7 @@ async function frame(box: GeographicBounds, zoom: number) {
     anacondaRows = rows.length ? rows : cities;
     poiRows = clusterPlaces(anacondaRows, zoom, box);
   }
-  poiRows = [...poiRows, ...anacondaFeeds(anacondaRows, zoom), ...portxFeeds(anacondaRows, zoom), ...operatorFeeds(anacondaRows, zoom), ...fusionContext(anacondaRows, zoom, box), ...iplasmaFeeds(anacondaRows, zoom), ...conscienceFeeds(anacondaRows, zoom)];
+  poiRows = [...poiRows, ...anacondaFeeds(anacondaRows, zoom), ...portxFeeds(anacondaRows, zoom), ...operatorFeeds(anacondaRows, zoom), ...fusionContext(anacondaRows, zoom, box), ...iplasmaFeeds(anacondaRows, zoom), ...conscienceFeeds(anacondaRows, zoom), ...aicpFeeds(anacondaRows, zoom)];
   return snapshot(locations, index, poiSnapshot(poiRows, box));
 }
 
@@ -694,6 +696,56 @@ function conscienceFeeds(rows: { lat: number; lng: number; name?: string }[], zo
       lat: Math.max(-90, Math.min(90, (group.latKey + 0.41) * span)),
       lng: Math.max(-180, Math.min(180, (group.lngKey + 0.67) * span - 180)),
       origin: "neural-feed", category: expanded ? "conscience" : "conscience-cluster", color: CONSCIENCE, provenance: CONSCIENCE_PROVENANCE,
+      observed_at: observed, refreshed_at: refreshed,
+      ...(expanded ? {} : { cluster: { count: group.count, bounds: {
+        south: Math.max(-90, group.south - span * 0.08), north: Math.min(90, group.north + span * 0.08),
+        west: Math.max(-180, group.west - span * 0.08), east: Math.min(180, group.east + span * 0.08),
+      } } }),
+    }));
+  }
+  return out;
+}
+
+function aicpLabel(feeds: string[]): string {
+  if (feeds.length >= 5) return feeds[3];
+  if (feeds.length === 4) return `${feeds[3]} / ${feeds[1]}`;
+  if (feeds.length === 3) return `${feeds[2]} / ${feeds[0]}`;
+  return `${feeds[0]} / ${feeds[1]}`;
+}
+
+function aicpFeeds(rows: { lat: number; lng: number; name?: string }[], zoom: number): Place[] {
+  if (zoom < 8 || !rows.length) return [];
+  const span = zoom < 11 ? 0.13 : zoom < 14 ? 0.06 : zoom < 17 ? 0.018 : 0.0048;
+  const groups = new Map<string, { count: number; latKey: number; lngKey: number; south: number; north: number; west: number; east: number; feeds: string[] }>();
+  for (const row of rows) {
+    const latKey = Math.floor(row.lat / span);
+    const lngKey = Math.floor((row.lng + 180) / span);
+    const key = `${latKey}:${lngKey}`;
+    const feed = (row.name || "").replace(/\s+/g, " ").trim().replace(/^NeuralLink · /, "");
+    const current = groups.get(key);
+    if (!current) groups.set(key, { count: 1, latKey, lngKey, south: row.lat, north: row.lat, west: row.lng, east: row.lng, feeds: feed ? [feed] : [] });
+    else {
+      current.count += 1;
+      current.south = Math.min(current.south, row.lat); current.north = Math.max(current.north, row.lat);
+      current.west = Math.min(current.west, row.lng); current.east = Math.max(current.east, row.lng);
+      if (feed && !current.feeds.includes(feed) && current.feeds.length < 8) current.feeds.push(feed);
+    }
+  }
+  const refreshed = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+  const observed = `fusion cycle ${fusionCycle()}`;
+  const expanded = zoom >= 16;
+  const out: Place[] = [];
+  for (const group of groups.values()) {
+    if (group.feeds.length < 2) continue;
+    const label = aicpLabel(group.feeds);
+    const detail = group.feeds.join(" · ");
+    out.push(pin({
+      id: `neural:aicp:z${zoom}:${group.latKey}:${group.lngKey}`,
+      name: label.length > 36 ? `${label.slice(0, 35).trimEnd()}…` : label,
+      ...(detail !== label ? { address: detail.slice(0, 280) } : {}),
+      lat: Math.max(-90, Math.min(90, (group.latKey + 0.28) * span)),
+      lng: Math.max(-180, Math.min(180, (group.lngKey + 0.81) * span - 180)),
+      origin: "neural-feed", category: expanded ? "aicp" : "aicp-cluster", color: AICP, provenance: AICP_PROVENANCE,
       observed_at: observed, refreshed_at: refreshed,
       ...(expanded ? {} : { cluster: { count: group.count, bounds: {
         south: Math.max(-90, group.south - span * 0.08), north: Math.min(90, group.north + span * 0.08),

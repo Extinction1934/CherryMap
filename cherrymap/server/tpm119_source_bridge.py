@@ -26,6 +26,7 @@ from array import array
 from bisect import bisect_left, bisect_right
 from urllib.parse import unquote, urlsplit
 
+from .aicp_apple import pin_fields as aicp_pin
 from .anaconda_plugin import pin_fields as anaconda_pin
 from .conscience_coreweave import pin_fields as conscience_pin
 from .iplasma_c3 import pin_fields as iplasma_pin
@@ -38,14 +39,14 @@ LATTICE_COLOR = BRIDGE_COLOR
 LATTICE_PROVENANCE = "NeuralLink Restricted Lattice Partner Direct · TPM-119 source bridge"
 LIVE_COLOR = "#1a4fbf"
 LIVE_PROVENANCE = "TPM-119 connector · live tactical fusion"
-MAX_CELLS = 240
+MAX_CELLS = 320
 CACHE_LIMIT = 48
 FAR_RANGE_ZOOM = 8
 EXPAND_ZOOM = 14
 CLOSE_ZOOM = 16
-PIN_CEILING = 800
-PIN_CEILING_CLOSE = 1600
-PIN_CEILING_MAX = 2200
+PIN_CEILING = 1100
+PIN_CEILING_CLOSE = 2200
+PIN_CEILING_MAX = 2800
 TILE_SPAN = 0.008
 FILL_TARGET = 36
 _OSM_ID = re.compile(r"osm:(?:node|way|relation):[1-9][0-9]*\Z")
@@ -707,6 +708,7 @@ class Tpm119SourceBridge:
         self._emit_fusion_context(groups, zoom, cell, places, south, north, west, east)
         self._emit_iplasma(groups, zoom, places)
         self._emit_conscience(groups, zoom, places)
+        self._emit_aicp(groups, zoom, places)
         return places
 
     @staticmethod
@@ -1190,6 +1192,71 @@ class Tpm119SourceBridge:
                 record = _cluster_record(
                     identifier=record_id, name=fields["name"], lat=lat, lng=lng, origin="neural-feed",
                     category="conscience-cluster", color=fields["color"], provenance=fields["provenance"],
+                    count=count, bounds=_bounds(agg[3], agg[4], agg[5], agg[6], span * 0.08),
+                )
+            if fields["address"]:
+                record["address"] = fields["address"]
+            record["observed_at"] = fields["observed_at"]
+            record["refreshed_at"] = refreshed
+            places.append(record)
+
+    def _emit_aicp(self, groups: dict, zoom: int, places: list[dict[str, object]]) -> None:
+        """Apple AICP cells. Own span, fused with the conscience diaphragm."""
+        if zoom < FAR_RANGE_ZOOM or not groups:
+            return
+        cycle = self._fusion_cycle()
+        refreshed = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        span = 0.13 if zoom < 11 else 0.06 if zoom < 14 else 0.018 if zoom < 17 else 0.0048
+        buckets: dict[tuple[int, int], list] = {}
+        for payload in groups.values():
+            points: list[tuple[float, float, list[str]]] = []
+            if payload and isinstance(payload[0], tuple):
+                points = [(float(item[0]), float(item[1]), [str(item[4] or "")]) for item in payload]
+            else:
+                count = int(payload[0]) if payload else 0
+                if 1 <= count <= 236_560:
+                    stored = payload[21] if len(payload) > 21 and isinstance(payload[21], list) else []
+                    points = [(float(payload[1]) / count, float(payload[2]) / count, [str(item) for item in stored])]
+            for lat, lng, names in points:
+                key = (math.floor(lat / span), math.floor((lng + 180.0) / span))
+                current = buckets.get(key)
+                if current is None:
+                    current = [1, lat, lng, lat, lat, lng, lng, []]
+                    buckets[key] = current
+                else:
+                    current[0] += 1
+                    current[1] += lat
+                    current[2] += lng
+                    if lat < current[3]:
+                        current[3] = lat
+                    if lat > current[4]:
+                        current[4] = lat
+                    if lng < current[5]:
+                        current[5] = lng
+                    if lng > current[6]:
+                        current[6] = lng
+                for name in names:
+                    _remember_feed(current, name)
+        expanded = zoom >= 16
+        for (lat_i, lng_i), agg in buckets.items():
+            count = int(agg[0])
+            if count < 1:
+                continue
+            lat = max(-90.0, min(90.0, (lat_i + 0.28) * span))
+            lng = max(-180.0, min(180.0, (lng_i + 0.81) * span - 180.0))
+            fields = aicp_pin(cycle, list(agg[7]))
+            if not fields["name"]:
+                continue
+            record_id = f"neural:aicp:z{zoom}:{lat_i}:{lng_i}"
+            if expanded:
+                record = _pin_record(
+                    identifier=record_id, name=fields["name"], lat=lat, lng=lng, origin="neural-feed",
+                    category=fields["category"], color=fields["color"], provenance=fields["provenance"],
+                )
+            else:
+                record = _cluster_record(
+                    identifier=record_id, name=fields["name"], lat=lat, lng=lng, origin="neural-feed",
+                    category="aicp-cluster", color=fields["color"], provenance=fields["provenance"],
                     count=count, bounds=_bounds(agg[3], agg[4], agg[5], agg[6], span * 0.08),
                 )
             if fields["address"]:

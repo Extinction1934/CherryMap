@@ -69,6 +69,15 @@ function authPopupPlugin(): Plugin {
       // Register immediately (not in a returned post-hook) so we run BEFORE
       // TanStack Start / the SPA HTML fallback. A model-authored
       // `src/routes/auth/popup.tsx` React page must never win this path.
+      server.middlewares.use((req, res, next) => {
+        const writeHead = res.writeHead.bind(res);
+        res.writeHead = ((...args: unknown[]) => {
+          res.setHeader("Permissions-Policy", "geolocation=*");
+          return writeHead(...(args as Parameters<typeof writeHead>));
+        }) as typeof res.writeHead;
+        res.setHeader("Permissions-Policy", "geolocation=*");
+        next();
+      });
       server.middlewares.use(async (req, res, next) => {
         try {
           const rawUrl = req.url ?? "";

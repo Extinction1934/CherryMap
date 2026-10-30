@@ -27,6 +27,7 @@ const ANCHORS: { color: string; test: (place: Place) => boolean }[] = [
   { color: '#e36a12', test: place => place.category === 'portx' || place.category === 'portx-cluster' },
   { color: '#be185d', test: place => place.category === 'operator' || place.category === 'operator-cluster' },
   { color: '#d946ef', test: place => place.category === 'iplasma-c3' || place.category === 'iplasma-c3-cluster' },
+  { color: '#0369a1', test: place => place.category === 'aicp' || place.category === 'aicp-cluster' },
   { color: '#0f766e', test: place => place.category === 'interconnect-fusion' },
   { color: '#24312c', test: place => place.origin === 'open-poi' },
   { color: '#396b94', test: place => place.origin === 'open-index' || place.origin === 'index-cluster' },
@@ -63,7 +64,7 @@ function ring(handles: InterconnectHandle[]): InterconnectEdge[] {
   return edges;
 }
 
-export function interconnectGraph(places: Place[], center: { lat: number; lng: number }): InterconnectGraph {
+export function interconnectGraph(places: Place[], _center: { lat: number; lng: number }): InterconnectGraph {
   const handles = places
     .filter(place => place.category === 'interconnect-fusion' && Number.isFinite(place.lat) && Number.isFinite(place.lng))
     .map(place => ({
@@ -75,21 +76,19 @@ export function interconnectGraph(places: Place[], center: { lat: number; lng: n
     }))
     .filter(handle => handle.readout.length > 0)
     .sort((a, b) => a.lat - b.lat || a.lng - b.lng);
-  let conscience = places
-    .filter(place => (place.category === 'conscience' || place.category === 'conscience-cluster') && Number.isFinite(place.lat) && Number.isFinite(place.lng))
-    .map(place => ({ lat: place.lat, lng: place.lng }))
+  const conscience = places
+    .filter(place => (place.category === 'conscience' || place.category === 'conscience-cluster' || place.category === 'aicp' || place.category === 'aicp-cluster') && Number.isFinite(place.lat) && Number.isFinite(place.lng))
+    .map(place => ({ lat: place.lat, lng: place.lng, conscience: place.category === 'conscience' || place.category === 'conscience-cluster' }))
     .sort((a, b) => a.lat - b.lat || a.lng - b.lng);
-  if (conscience.length > 36) {
-    conscience = [...conscience].sort((a, b) => ((a.lat - center.lat) ** 2 + (a.lng - center.lng) ** 2) - ((b.lat - center.lat) ** 2 + (b.lng - center.lng) ** 2)).slice(0, 36);
-  }
   const edges = ring(handles);
-  const conscienceHandles = conscience.map(pin => ({ lat: pin.lat, lng: pin.lng, readout: '', detail: '', color: '#ca8a04' }));
-  edges.push(...ring(conscienceHandles).map(edge => ({ ...edge, color: '#ca8a04' })));
+  const conscienceHandles = conscience.map(pin => ({ lat: pin.lat, lng: pin.lng, readout: '', detail: '', color: pin.conscience ? '#ca8a04' : '#0369a1' }));
+  edges.push(...ring(conscienceHandles));
   const families = ANCHORS.map(anchor => ({
     color: anchor.color,
     points: places.filter(place => anchor.test(place) && Number.isFinite(place.lat) && Number.isFinite(place.lng)).map(place => ({ lat: place.lat, lng: place.lng })),
   })).filter(family => family.points.length > 0);
   for (const pin of conscience) {
+    if (!pin.conscience) continue;
     for (const family of families) {
       const anchor = nearest(pin, family.points);
       if (Math.abs(anchor.lat - pin.lat) < 1e-6 && Math.abs(anchor.lng - pin.lng) < 1e-6) continue;
