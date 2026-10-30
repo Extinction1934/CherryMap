@@ -53,6 +53,7 @@ function injectHeadStreaming(response: Response, host: string): Response {
   );
   const headers = new Headers(response.headers);
   headers.delete("content-length");
+  headers.set("Permissions-Policy", "geolocation=*");
   return new Response(transformed, {
     status: response.status,
     statusText: response.statusText,
@@ -92,6 +93,7 @@ export default async function grokPwaMiddleware(
       headers: {
         "content-type": "text/html; charset=utf-8",
         "cache-control": "no-cache",
+        "Permissions-Policy": "geolocation=*",
       },
     });
   }
@@ -105,7 +107,10 @@ export default async function grokPwaMiddleware(
     String(result.headers.get("content-type") ?? "").includes("text/html") &&
     !result.headers.get("content-encoding")
   ) {
-    return injectHeadStreaming(result, requestHost(event));
+    const html = injectHeadStreaming(result, requestHost(event));
+    html.headers.set("Permissions-Policy", "geolocation=*");
+    return html;
   }
+  if (result instanceof Response) result.headers.set("Permissions-Policy", "geolocation=*");
   return result;
 }
